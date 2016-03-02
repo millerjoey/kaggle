@@ -24,32 +24,25 @@ qplot(relevance, geom="histogram", bins=15)
 #========Create Dictionary=====
 # Get important words, defined through some cutoff value for a lowest relevance.
 # Partition dataset by cutoff:
-train3 <- train[train$relevance>=3,]
-train2 <- train[train$relevance<3 & train$relevance>=2,]
-train1 <- train[train$relevance<2 & train$relevance>=1,]
+index3 <- train$relevance>=3
+index2 <- train$relevance<3 & train$relevance>=2
+index1 <- train$relevance<2 & train$relevance>=1
 
-View(train3)
-
-getTitle <- function(data) {
-  splitby <- c(" ")
-  product <- tolower(paste(unlist(strsplit(data[3], split = "-")), collapse = " "))
-  product <- unlist(strsplit(product, split=" "))
-  return(product)
+splitDataBy <- function(data, charVector, index) {
+  x <- data[index]
+  for (split in charVector) {
+    x <- tolower(unlist(strsplit(as.character(x), split)))
+    x <- x[!x==""]
+  }
+  return(x) # Remove empty values
 }
 
-titles3 <- apply(train3, MARGIN = 1, getTitle)
+titles <- apply(train, MARGIN = 1, splitDataBy, charVector=c(" ", "-", ","), index=3)
+searches <-  apply(train, MARGIN = 1, splitDataBy, charVector=c(" ", "-", ","), index=4)
 
-getSearch <- function(data) {
-  splitby <- c(" ")
-  product <- tolower(paste(unlist(strsplit(data[4], split = "-")), collapse = " "))
-  product <- unlist(strsplit(product, split=" "))
-  return(product)
-}
 
-searches3 <-  apply(train3, MARGIN = 1, getSearch)
-
-max(unlist(lapply(X=searches3, length)))
-max(unlist(lapply(X=titles3, length)))
+max(unlist(lapply(X=searches[index3], length)))
+max(unlist(lapply(X=titles[index3], length)))
 
 # This just copies every intersection into the empty matrix. Second loop because some intersections have multiple elements.
 intersectionMat <- function(searches, titles) {
@@ -68,36 +61,49 @@ intersectionMat <- function(searches, titles) {
   return(words)
 }
 
-words3 <- intersectionMat(searches3, titles3)
+words <- intersectionMat(searches, titles)
 
-sum(!is.na(words3[,1]))/length(searches3) # 17279/19125=90.34% of 3s have common words.
+sum(!is.na(words[,1]))/length(searches) # 85% of have common words.
 
-words3Vec <- as.vector(x = words3, mode = "character") # Unwind matrix into vector
-words3Vec <- words3Vec[is.na(words3Vec)==F]             # Get rid of empties
-length(unique(words3Vec))                             # 2896 unique words. This is our dictionary.
+# Words with relevance=3
+words3Vec <- as.vector(x = words[index3,], mode = "character") # Unwind matrix into vector
+words3Vec <- words3Vec[is.na(words3Vec)==F]                    # Get rid of empties
+length(unique(words3Vec))                                      # 2896 unique words. This was our dictionary, according to the original plan. I ended up just using # common words as the predictor.
 
 # wordsVec now contains all copies of words that are common to the search string and the product.
 
-table <- table(wordsVec) # Don't go down this rabbit hole. Some items are more popular than others, so they are represented more frequently.
-
 #==========================================================
-# I want to see the frequency that these words occur in for
-# the other relevance scores. Hopefully the freq correlates 
-# with relevance.
+# Preliminary Predictions
 #==========================================================
+predict <- function(wordsRow) {
+  if (length(wordsRow[is.na(wordsRow)==F])>1) {
+    prediction <- 2.448595
+  }
+  if (length(wordsRow[is.na(wordsRow)==F])==1) {
+    prediction <- 2.352597
+  }
+  if (length(wordsRow[is.na(wordsRow)==F])==0) {
+    prediction <- 2.185824
+  }
+  return(prediction)
+}
 
-# Train2
-titles2 <- apply(train2, MARGIN = 1, getTitle)
-searches2 <-  apply(train2, MARGIN = 1, getSearch)
+# to beat: 2.448595, 2.352597, 2.185824 => 0.525997
 
-words2 <- intersectionMat(searches = searches2, titles = titles2)
-sum(!is.na(words2[,1]))/length(searches2) # 86.12% have common words.
+# To optimize the assignments, I used the average proportions according to each partition by relevance.
+twoMatches <- apply(words, MARGIN=1, function(x) sum(!is.na(x))>1)
+mean(train[twoMatches,5])
 
-#train1
-titles1 <- apply(train1, MARGIN = 1, getTitle)
-searches1 <-  apply(train1, MARGIN = 1, getSearch)
+oneMatch <- apply(words, MARGIN=1, function(x) sum(!is.na(x))==1)
+mean(train[oneMatch,5])
 
-words1 <- intersectionMat(searches=searches1, titles = titles1)
-sum(!is.na(words1[,1]))/length(searches1) # 73.88 % have common words.
+noMatch <- apply(words, MARGIN=1, function(x) sum(!is.na(x))==0)
+mean(train[noMatch,5])
 
+computeRMS <- function(predictions, data) {
+  return(sqrt(sum((predictions-data$relevance)^2)/length(predictions)))
+}
 
+predictions <- apply(words, MARGIN=1, FUN = predict)
+
+computeRMS(predictions,train) # RMS is 0.525997
