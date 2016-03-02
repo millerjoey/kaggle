@@ -13,7 +13,7 @@ for (i in x) {
   y[index] <- sum(train$relevance >= i)
   index <- index + 1
 }
-qplot(x, y, ylim=c(0, 75000), ylab="Number of Examples Above Score", xlab="Relevance Score")
+qplot(x, y, ylim=c(0, 75000), ylab="Number of Examples geq Each Score", xlab="Relevance Score")
 
 # Histogram of the same
 relevance <- train$relevance
