@@ -73,35 +73,65 @@ length(unique(words3Vec))                                      # 2896 unique wor
 # wordsVec now contains all copies of words that are common to the search string and the product.
 
 #==========================================================
-# Preliminary Predictions
+# Parameter Estimates
 #==========================================================
-predict <- function(wordsRow) {
-  if (length(wordsRow[is.na(wordsRow)==F])>1) {
-    prediction <- 2.448595
-  }
-  if (length(wordsRow[is.na(wordsRow)==F])==1) {
-    prediction <- 2.352597
-  }
-  if (length(wordsRow[is.na(wordsRow)==F])==0) {
-    prediction <- 2.185824
-  }
-  return(prediction)
-}
 
-# to beat: 2.448595, 2.352597, 2.185824 => 0.525997
+# Number of Matching words:
+fiveMatches <- apply(words, MARGIN=1, function(x) sum(!is.na(x))>4)
+avg5 <- mean(train[fiveMatches,5])
 
-# To optimize the assignments, I used the average proportions according to each partition by relevance.
-twoMatches <- apply(words, MARGIN=1, function(x) sum(!is.na(x))>1)
-mean(train[twoMatches,5])
+fourMatches <- apply(words, MARGIN=1, function(x) sum(!is.na(x))==4)
+avg4 <- mean(train[fourMatches,5])
+
+threeMatches <- apply(words, MARGIN=1, function(x) sum(!is.na(x))==3)
+avg3 <- mean(train[threeMatches,5])
+
+twoMatches <- apply(words, MARGIN=1, function(x) sum(!is.na(x))==2)
+avg2 <- mean(train[twoMatches,5])
 
 oneMatch <- apply(words, MARGIN=1, function(x) sum(!is.na(x))==1)
-mean(train[oneMatch,5])
+avg1 <- mean(train[oneMatch,5])
 
 noMatch <- apply(words, MARGIN=1, function(x) sum(!is.na(x))==0)
-mean(train[noMatch,5])
+avg0 <- mean(train[noMatch,5])
+
+avgs <- c(avg0, avg1, avg2, avg3, avg4, avg5)
+
+# Length of Search Phrase:
+searchLengths <- sapply(searches, FUN = length)
+
+sLength1 <- searchLengths == 1
+mean(train[sLength1,5])
+
+sLength2 <- searchLengths == 2
+mean(train[sLength2,5])
+
+sLength3 <- searchLengths == 3
+mean(train[sLength3,5])
+
+sLength45 <- searchLengths == 4 | searchLengths == 5
+mean(train[sLength45,5])
+
+sLength678 <- searchLengths == 6 | searchLengths == 7 | searchLengths == 8
+mean(train[sLength678,5])
+var(train[sLength678,5])
+
+sLength9 <- searchLengths == 9
+mean(train[sLength9,5])
+var(train[sLength9,5])
+
+#====================================
+# Predictions
+#====================================
 
 computeRMS <- function(predictions, data) {
   return(sqrt(sum((predictions-data$relevance)^2)/length(predictions)))
+}
+
+predict <- function(wordsRow) {
+  if (length(wordsRow[!is.na(wordsRow)]) > 5) {prediction <- avgs[6]}
+  else {prediction <- avgs[length(wordsRow[!is.na(wordsRow)])+1]}
+  return(prediction)
 }
 
 predictions <- apply(words, MARGIN=1, FUN = predict)
